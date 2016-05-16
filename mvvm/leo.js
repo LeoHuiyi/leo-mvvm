@@ -66,6 +66,12 @@
                     return _Set
                 }
             }()),
+            bind: function bind(fn, ctx) {
+                return function(a) {
+                    var l = arguments.length
+                    return l ? l > 1 ? fn.apply(ctx, arguments) : fn.call(ctx, a) : fn.call(ctx)
+                };
+            },
             noop: function noop() {}
         }
     }())
@@ -390,7 +396,7 @@
                         def.set = util.noop
                     } else {
                         def.get = makeComputedGetter(userDef.get, this, key)
-                        def.set = userDef.set ? bind(userDef.set, this) : util.noop
+                        def.set = userDef.set ? util.bind(userDef.set, this) : util.noop
                     }
                     Object.defineProperty(this, key, def)
                 }

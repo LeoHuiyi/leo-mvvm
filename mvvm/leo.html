@@ -19,10 +19,16 @@
             }
         },
         computed: {
-            b: function() {
-                var a = this.name;
-                var b = this.message
-                return a + " " + b + " " + this.num + " " + this.deep.a + this.deep.b
+            b: {
+                get: function() {
+                    var a = this.name;
+                    var b = this.message
+                    return a + " " + b + " " + this.num + " " + this.deep.a + this.deep.b
+                },
+                set: function(newVal) {
+                    console.log(this)
+                    return this.a = newVal + '43243242432'
+                }
             },
             d: function() {
                 return this.b + " " + this.name + " " + JSON.stringify(this.arr)
@@ -37,6 +43,7 @@
     leo.arr.push(4)
     leo.deep.a = 'wao'
     leo.deep.b = 'leoleoleo'
+    leo.b = 'leo'
     console.log(leo.d)
     document.getElementById('btn').addEventListener('click', function(){
         leo.num = i++

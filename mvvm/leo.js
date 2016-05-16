@@ -28,6 +28,14 @@
                 }
                 return ret
             },
+            remove: function remove(arr, item){
+                if(Array.isArray(arr)){
+                    var index = arr.indexOf(item)
+                    if(index > -1){
+                        arr.splice(index, 1)
+                    }
+                }
+            },
             def: function def(obj, key, val, enumerable) {
                 Object.defineProperty(obj, key, {
                     value: val,
@@ -36,6 +44,28 @@
                     configurable: true
                 })
             },
+            Set: (function Set(){
+                var _Set
+                if (typeof Set !== 'undefined' && Set.toString().match(/native code/)) {
+                    _Set = Set
+                } else {
+                    _Set = function () {
+                        this.set = Object.create(null)
+                    }
+                    _Set.prototype.has = function (key) {
+                        return this.set[key] !== undefined
+                    }
+                    _Set.prototype.add = function (key) {
+                        this.set[key] = 1
+                    }
+                    _Set.prototype.clear = function () {
+                        this.set = Object.create(null)
+                    }
+                }
+                return function Set() {
+                    return _Set
+                }
+            }()),
             noop: function noop() {}
         }
     }())
@@ -52,12 +82,16 @@
         Dep.prototype.addSub = function (sub) {
             this.subs.push(sub)
         }
+        Dep.prototype.removeSub = function (sub) {
+            util.remove(this.subs, sub)
+        }
         Dep.prototype.notify = function () {
             var subs = util.toArray(this.subs)
             for (var i = 0, l = subs.length; i < l; i++) {
                 subs[i].update()
             }
         }
+        Dep.target = null
         return Dep
     }(util))
     var Watcher = (function Watcher(util, Dep) {
@@ -81,6 +115,9 @@
             this.beforeGet()
             var scope = this.scope || this.vm
             var value = this.getter.call(scope, scope)
+            if (this.deep) {
+                traverse(value)
+            }
             this.afterGet()
             return value
         }
@@ -103,6 +140,34 @@
             this.deps = this.newDeps
             this.newDeps = tmp
         }
+        var seenObjects = new util.Set()
+        function traverse (val, seen) {
+            let i, keys
+            if (!seen) {
+                seen = seenObjects
+                seen.clear()
+            }
+            const isA = isArray(val)
+            const isO = isObject(val)
+            if (isA || isO) {
+                if (val.__ob__) {
+                    var depId = val.__ob__.dep.id
+                    if (seen.has(depId)) {
+                        return
+                    } else {
+                        seen.add(depId)
+                    }
+                }
+                if (isA) {
+                    i = val.length
+                    while (i--) traverse(val[i], seen)
+                } else if (isO) {
+                    keys = Object.keys(val)
+                    i = keys.length
+                    while (i--) traverse(val[keys[i]], seen)
+                }
+            }
+        }
         Watcher.prototype.addDep = function (dep) {
             var id = dep.id
             if (!this.newDepIds[id]) {
@@ -116,6 +181,8 @@
         Watcher.prototype.update = function () {
             if (this.lazy) {
                 this.dirty = true
+            }else{
+                this.run()
             }
         }
         Watcher.prototype.run = function () {
@@ -123,7 +190,7 @@
             if (value !== this.value) {
                 var oldValue = this.value
                 this.value = value
-                this.cb.call(this.vm, value, oldValue)
+                this.cb && this.cb.call(this.vm, value, oldValue)
             }
         }
         Watcher.prototype.evaluate = function () {
@@ -141,6 +208,56 @@
         return Watcher
     }(util, Dep))
     var observe = (function observe(util, Dep) {
+        var arrayObserve = (function arrayObserve(util){
+            var arrayProto = Array.prototype
+            var arrayMethods = Object.create(arrayProto)
+            var arrayKeys = Object.getOwnPropertyNames(arrayMethods)
+            ;['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].forEach(function (method){
+                var original = arrayProto[method]
+                util.def(arrayMethods, method, function mutator () {
+                    var i = arguments.length
+                    var args = new Array(i)
+                    while (i--) {
+                        args[i] = arguments[i]
+                    }
+                    var result = original.apply(this, args)
+                    var ob = this.__ob__
+                    var inserted
+                    switch (method) {
+                        case 'push':
+                            inserted = args
+                            break
+                        case 'unshift':
+                            inserted = args
+                            break
+                        case 'splice':
+                            inserted = args.slice(2)
+                            break
+                    }
+                    if (inserted) ob.observeArray(inserted)
+                    ob.dep.notify()
+                    return result
+                })
+            })
+            util.def(arrayProto, '$set', function $set (index, val) {
+                if (index >= this.length) {
+                    this.length = Number(index) + 1
+                }
+                return this.splice(index, 1, val)[0]
+            })
+            util.def(arrayProto, '$remove', function $remove (item) {
+                if (!this.length) return
+                var index = this.indexOf(item)
+                if (index > -1) {
+                    return this.splice(index, 1)
+                }
+            })
+            return {
+                arrayProto: arrayProto,
+                arrayMethods: arrayMethods,
+                arrayKeys: arrayKeys
+            }
+        }(util))
         function observe(value, vm) {
             if (!value || typeof value !== 'object') {
                 return
@@ -153,10 +270,32 @@
             }
             return ob
         }
+        function protoAugment(target, src) {
+            target.__proto__ = src
+        }
+        function copyAugment(target, src, keys) {
+            for(var i = 0, l = keys.length; i < l; i++) {
+                var key = keys[i]
+                util.def(target, key, src[key])
+            }
+        }
+        var hasProto = '__proto__' in {}
         function Observer(value) {
             this.value = value
+            this.dep = new Dep()
             util.def(value, '__ob__', this)
-            this.walk(value)
+            if(Array.isArray(value)) {
+                var augment = hasProto ? protoAugment : copyAugment
+                augment(value, arrayObserve.arrayMethods, arrayObserve.arrayKeys)
+                this.observeArray(value)
+            }else {
+                this.walk(value)
+            }
+        }
+        Observer.prototype.observeArray = function(items) {
+            for(var i = 0, l = items.length; i < l; i++) {
+                observe(items[i])
+            }
         }
         Observer.prototype.walk = function (obj) {
             var keys = Object.keys(obj)
@@ -170,32 +309,47 @@
         function defineReactive(obj, key, val) {
             var dep = new Dep(key)
             var property = Object.getOwnPropertyDescriptor(obj, key)
-            if (property && property.configurable === false) {
-                return
-            }
+            var getter = property && property.get
+            var setter = property && property.set
+            var childOb = observe(val)
             Object.defineProperty(obj, key, {
                 enumerable: true,
                 configurable: true,
                 get: function reactiveGetter() {
-                    var value = val
-                    if (Dep.target) {
+                    var value = getter ? getter.call(obj) : val
+                    if(Dep.target) {
                         dep.depend()
+                        if(childOb) {
+                            childOb.dep.depend()
+                        }
+                        if(Array.isArray(value)) {
+                            for(var e, i = 0, l = value.length; i < l; i++) {
+                                e = value[i]
+                                e && e.__ob__ && e.__ob__.dep.depend()
+                            }
+                        }
                     }
                     return value
                 },
                 set: function reactiveSetter(newVal) {
-                    var value = val
-                    if (newVal === value) {
+                    var value = getter ? getter.call(obj) : val
+                    if(newVal === value) {
                         return
                     }
-                    val = newVal
+                    if(setter) {
+                        setter.call(obj, newVal)
+                    }else {
+                        val = newVal
+                    }
+                    childOb = observe(newVal)
                     dep.notify()
                 }
             })
         }
         return observe
     }(util, Dep))
-    var Leo = (function Leo(util, observe, Watcher){
+    var Leo = (function Leo(util, observe, Watcher, win){
+        var prevLeo = win.Leo
         function Leo(option) {
             this.option = option
             this._data
@@ -242,6 +396,13 @@
                 }
             }
         }
+        Leo.prototype.$watch = function (expOrFn, cb, options) {
+            var vm = this;
+            var watcher = new Watcher(vm, expOrFn, cb, options);
+            if (options && options.immediate) {
+                cb && cb.call(vm, watcher.value);
+            }
+        }
         function makeComputedGetter(getter, owner, key) {
             var watcher = new Watcher(owner, getter, null, {
                 lazy: true,
@@ -257,7 +418,12 @@
                 return watcher.value
             }
         }
+        Leo.noConflict = function () {
+            if(prevLeo !== undefined){
+                return win.Leo = prevLeo
+            }
+        }
         return Leo
-    }(util, observe, Watcher))
+    }(util, observe, Watcher, win))
     win.Leo = Leo
 }(window));

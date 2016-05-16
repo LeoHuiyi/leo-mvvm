@@ -12,24 +12,37 @@
         data: {
             name :"leo",
             message: 'Hello!',
-            num: 0
+            num: 0,
+            arr: [1, 2, 3],
+            deep: {
+                a: 'wahahhaha'
+            }
         },
         computed: {
             b: function() {
                 var a = this.name;
                 var b = this.message
-                return a + " " + b + " " + this.num
+                return a + " " + b + " " + this.num + " " + this.deep.a + this.deep.b
             },
             d: function() {
-                return this.b + " " + this.name
+                return this.b + " " + this.name + " " + JSON.stringify(this.arr)
             }
         },
     }), i = 1
+//    leo.$watch(function(){
+//        console.log(arguments)
+//    })
     console.log(leo.d)
     leo.message = 'TC'
+    leo.arr.push(4)
+    leo.deep.a = 'wao'
+    leo.deep.b = 'leoleoleo'
     console.log(leo.d)
     document.getElementById('btn').addEventListener('click', function(){
         leo.num = i++
+        leo.arr.push(i)
+//        leo.deep.a = 'deep.a: ' + i++
+//        leo.deep.b = 'deep.b: ' + i++
         console.log(leo.d)
     })
 </script>

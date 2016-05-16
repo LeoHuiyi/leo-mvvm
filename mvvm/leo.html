@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>leo-mvvm</title>
+</head>
+<body>
+<button id="btn">leo</button>
+<script src="leo.js"></script>
+<script>
+    var leo = new Leo({
+        data: {
+            name :"leo",
+            message: 'Hello!',
+            num: 0
+        },
+        computed: {
+            b: function() {
+                var a = this.name;
+                var b = this.message
+                return a + " " + b + " " + this.num
+            },
+            d: function() {
+                return this.b + " " + this.name
+            }
+        },
+    }), i = 1
+    console.log(leo.d)
+    leo.message = 'TC'
+    console.log(leo.d)
+    document.getElementById('btn').addEventListener('click', function(){
+        leo.num = i++
+        console.log(leo.d)
+    })
+</script>
+</body>
+</html>

@@ -174,6 +174,7 @@
                 }
             }
         }
+
         Watcher.prototype.addDep = function (dep) {
             var id = dep.id
             if (!this.newDepIds[id]) {
@@ -210,6 +211,13 @@
             while (i--) {
                 this.deps[i].depend()
             }
+        }
+        Watcher.prototype.teardown = function () {
+            var i = this.deps.length
+            while (i--) {
+                this.deps[i].removeSub(this)
+            }
+            this.vm = this.cb = this.value = null
         }
         return Watcher
     }(util, Dep))
@@ -407,6 +415,9 @@
             var watcher = new Watcher(vm, expOrFn, cb, options)
             if (options && options.immediate) {
                 cb && cb.call(vm, watcher.value)
+            }
+            return function unwatchFn() {
+                watcher.teardown()
             }
         }
         function makeComputedGetter(getter, owner, key) {

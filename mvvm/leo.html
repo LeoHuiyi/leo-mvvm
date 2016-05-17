@@ -5,6 +5,7 @@
     <title>leo-mvvm</title>
 </head>
 <body>
+<span id="span">wahah</span>
 <button id="btn">leo</button>
 <script src="leo.js"></script>
 <script>
@@ -26,30 +27,34 @@
                     return a + " " + b + " " + this.num + " " + this.deep.a + this.deep.b
                 },
                 set: function(newVal) {
-                    console.log(this)
-                    return this.a = newVal + '43243242432'
+                    return this.name = newVal + '43243242432'
                 }
             },
             d: function() {
                 return this.b + " " + this.name + " " + JSON.stringify(this.arr)
             }
         },
-    }), i = 1
-//    leo.$watch(function(){
-//        console.log(arguments)
-//    })
-    console.log(leo.d)
-    leo.message = 'TC'
-    leo.arr.push(4)
-    leo.deep.a = 'wao'
-    leo.deep.b = 'leoleoleo'
-    leo.b = 'leo'
-    console.log(leo.d)
+    }), i = 1, span = document.getElementById('span')
+    leo.$watch(function(){
+        return this.name
+    }, function(value, oldValue){
+        span.textContent = value
+    })
+
+//    console.log(leo.d)
+//    leo.message = 'TC'
+//    leo.arr.push(4)
+//    leo.deep.a = 'wao'
+//    leo.deep.b = 'leoleoleo'
+//    leo.b = 'leo'
+//    console.log(leo.d)
+    leo.name = '432'
     document.getElementById('btn').addEventListener('click', function(){
         leo.num = i++
         leo.arr.push(i)
-//        leo.deep.a = 'deep.a: ' + i++
-//        leo.deep.b = 'deep.b: ' + i++
+        leo.deep.a = 'deep.a: ' + i++
+        leo.deep.b = 'deep.b: ' + i++
+        leo.name = 'leoTc' + i++
         console.log(leo.d)
     })
 </script>

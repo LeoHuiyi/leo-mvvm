@@ -404,9 +404,9 @@
         }
         Leo.prototype.$watch = function (expOrFn, cb, options) {
             var vm = this;
-            var watcher = new Watcher(vm, expOrFn, cb, options);
+            var watcher = new Watcher(vm, expOrFn, cb, options)
             if (options && options.immediate) {
-                cb && cb.call(vm, watcher.value);
+                cb && cb.call(vm, watcher.value)
             }
         }
         function makeComputedGetter(getter, owner, key) {
